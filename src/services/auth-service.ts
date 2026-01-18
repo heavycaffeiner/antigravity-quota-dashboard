@@ -27,7 +27,18 @@ export class AuthService {
     this.verifier = this.generateCodeVerifier();
     sessionStorage.setItem('pkce_verifier', this.verifier);
 
-    const challenge = await this.generateCodeChallenge(this.verifier);
+    let challenge = this.verifier;
+    let method = 'plain';
+
+    if (window.crypto && window.crypto.subtle) {
+      try {
+        challenge = await this.generateCodeChallenge(this.verifier);
+        method = 'S256';
+      } catch (e) {
+        console.warn('Crypto API failed, falling back to plain PKCE', e);
+      }
+    }
+
     const redirectUri = window.location.origin;
 
     const params = new URLSearchParams({
@@ -36,7 +47,7 @@ export class AuthService {
       response_type: 'code',
       scope: SCOPES,
       code_challenge: challenge,
-      code_challenge_method: 'S256',
+      code_challenge_method: method,
       access_type: 'offline',
       prompt: 'consent',
       include_granted_scopes: 'true'
