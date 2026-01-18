@@ -1,8 +1,9 @@
 import { LitElement, html, css, svg } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, state, property } from 'lit/decorators.js';
 
 @customElement('login-view')
 export class LoginView extends LitElement {
+  @property({ type: Boolean }) isModal = false;
   @state() private isLoading = false;
   @state() private showManualInput = false;
   @state() private manualCode = '';
@@ -13,7 +14,13 @@ export class LoginView extends LitElement {
       bubbles: true,
       composed: true
     }));
-    // Keep loading state until window focus returns or manual input
+  }
+
+  private _handleClose() {
+    this.dispatchEvent(new CustomEvent('close', {
+      bubbles: true,
+      composed: true
+    }));
   }
 
   private _toggleManualInput() {
@@ -23,14 +30,13 @@ export class LoginView extends LitElement {
   private _handleManualSubmit() {
     if (!this.manualCode) return;
     
-    // Extract code from URL if full URL is pasted
     let code = this.manualCode;
     try {
       const url = new URL(this.manualCode);
       const codeParam = url.searchParams.get('code');
       if (codeParam) code = codeParam;
     } catch (e) {
-      // Not a URL, treat as raw code
+      // Not a URL
     }
 
     this.dispatchEvent(new CustomEvent('manual-login', {
@@ -43,6 +49,13 @@ export class LoginView extends LitElement {
   render() {
     return html`
       <div class="login-container">
+        ${this.isModal ? html`
+          <button class="close-btn" @click=${this._handleClose}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        ` : ''}
         <div class="login-card">
           <div class="logo-section">
             <div class="logo-icon">
@@ -145,6 +158,28 @@ export class LoginView extends LitElement {
       width: 100%;
       max-width: 400px;
       padding: 2rem;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      color: var(--text-secondary, #a1a1a1);
+      cursor: pointer;
+      z-index: 10;
+      padding: 8px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
     }
 
     .background-glow {

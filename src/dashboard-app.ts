@@ -25,6 +25,9 @@ export class DashboardApp extends LitElement {
   @state()
   private isAuthenticating = false;
 
+  @state()
+  private showAddAccountModal = false;
+
   async connectedCallback() {
     super.connectedCallback();
     
@@ -51,6 +54,9 @@ export class DashboardApp extends LitElement {
 
   private async _handleOAuthCallback(code: string) {
     this.isAuthenticating = true;
+    // Close modal if open
+    this.showAddAccountModal = false;
+    
     try {
       const token = await authService.handleCallback(code);
       let email = '';
@@ -127,6 +133,11 @@ export class DashboardApp extends LitElement {
     accountManager.setActiveAccount(email);
   }
 
+  private async _onLoginStart() {
+    const url = await authService.getLoginUrl();
+    window.open(url, '_blank');
+  }
+
   private async _handleManualLogin(e: CustomEvent) {
     const code = e.detail.code;
     if (code) {
@@ -134,13 +145,12 @@ export class DashboardApp extends LitElement {
     }
   }
 
-  private async _onLoginStart() {
-    const url = await authService.getLoginUrl();
-    window.open(url, '_blank');
+  private _onAddAccount() {
+    this.showAddAccountModal = true;
   }
 
-  private _onAddAccount() {
-    this._onLoginStart();
+  private _closeAddAccountModal() {
+    this.showAddAccountModal = false;
   }
 
   private _onLogoutAccount(e: CustomEvent) {
@@ -166,6 +176,17 @@ export class DashboardApp extends LitElement {
 
     return html`
       <div class="container">
+        ${this.showAddAccountModal ? html`
+          <div class="modal-overlay">
+            <login-view 
+              isModal
+              @login-start=${this._onLoginStart}
+              @manual-login=${this._handleManualLogin}
+              @close=${this._closeAddAccountModal}
+            ></login-view>
+          </div>
+        ` : ''}
+
         <header class="header">
           <div class="header-left">
              <div class="logo">QC</div>
@@ -199,7 +220,6 @@ export class DashboardApp extends LitElement {
       return html`<div class="empty-state">Select an account to view quota.</div>`;
     }
 
-    // Removed credits destructuring
     const { groups } = this.userInfo;
     const allModels = groups.flatMap(g => g.models);
     
@@ -214,7 +234,6 @@ export class DashboardApp extends LitElement {
           <span class="stat-label">Plan</span>
           <span class="stat-value highlight">${this.userInfo.planName}</span>
         </div>
-        <!-- Removed Credit Display -->
       </div>
 
       <div class="list-layout">
@@ -411,6 +430,21 @@ export class DashboardApp extends LitElement {
 
     @keyframes spin {
       to { transform: rotate(360deg); }
+    }
+
+    /* Modal Overlay */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(5px);
     }
   `;
 }
