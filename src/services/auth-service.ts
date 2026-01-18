@@ -91,6 +91,28 @@ export class AuthService {
     return data;
   }
 
+  async refreshAccessToken(refreshToken: string): Promise<TokenResponse> {
+    const params = new URLSearchParams({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken
+    });
+
+    const response = await fetch(TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error_description || 'Token refresh failed');
+    }
+
+    return await response.json();
+  }
+
   private generateCodeVerifier(): string {
     const array = new Uint8Array(32);
     window.crypto.getRandomValues(array);

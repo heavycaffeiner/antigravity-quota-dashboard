@@ -1,4 +1,4 @@
-import type { TokenResponse } from './auth-service';
+import { type TokenResponse, authService } from './auth-service';
 import type { AccountInfo } from '../types';
 
 interface AccountData {
@@ -113,7 +113,14 @@ export class AccountManager {
     }));
   }
 
-  getValidToken(email?: string): string | null {
+  async forceTokenRefresh(email: string): Promise<string | null> {
+    const account = this.accounts.get(email);
+    if (!account || !account.refreshToken) return null;
+    
+    return this.performRefresh(account);
+  }
+
+  async getValidToken(email?: string): Promise<string | null> {
     const targetId = email || this.activeAccountId;
     if (!targetId) return null;
 
@@ -122,16 +129,41 @@ export class AccountManager {
 
     // Check expiry (with 60s buffer)
     if (Date.now() > account.expiresAt - 60000) {
-      // In a real app, we would refresh here.
-      // For this demo, we mark as invalid or hope for the best if we can't refresh.
-      console.warn(`Token for ${targetId} is expired or expiring soon.`);
-      if (!account.refreshToken) {
-        return null; // Can't refresh
-      }
-      // TODO: Implement refresh logic integration
+      console.log(`Token for ${targetId} is expired or expiring soon. Refreshing...`);
+      return this.performRefresh(account);
     }
 
     return account.accessToken;
+  }
+
+  private async performRefresh(account: AccountData): Promise<string | null> {
+    if (!account.refreshToken) {
+      console.warn(`No refresh token for ${account.email}, cannot refresh.`);
+      return null;
+    }
+
+    try {
+      const newToken = await authService.refreshAccessToken(account.refreshToken);
+      
+      // Update account data
+      account.accessToken = newToken.access_token;
+      account.expiresAt = Date.now() + (newToken.expires_in * 1000);
+      if (newToken.refresh_token) {
+        account.refreshToken = newToken.refresh_token;
+      }
+      account.lastUsedAt = Date.now();
+      account.isInvalid = false;
+      
+      this.save();
+      console.log(`Successfully refreshed token for ${account.email}`);
+      return account.accessToken;
+
+    } catch (e) {
+      console.error(`Failed to refresh token for ${account.email}`, e);
+      account.isInvalid = true;
+      this.save();
+      return null;
+    }
   }
 }
 

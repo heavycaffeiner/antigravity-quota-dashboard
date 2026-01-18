@@ -26,9 +26,8 @@ export class QuotaService {
 
   async fetchQuota(email?: string): Promise<UserInfo | null> {
     const targetEmail = email || accountManager.getActiveAccount()?.email;
-    const token = accountManager.getValidToken(targetEmail);
 
-    if (!token || !targetEmail) {
+    if (!targetEmail) {
       return null;
     }
 
@@ -38,7 +37,7 @@ export class QuotaService {
 
       try {
         // Step A: Get Subscription & Project ID
-        subData = await this.fetchWithFallback('/v1internal:loadCodeAssist', token, {
+        subData = await this.fetchWithFallback('/v1internal:loadCodeAssist', targetEmail, {
           metadata: {
             ideType: "IDE_UNSPECIFIED",
             platform: "PLATFORM_UNSPECIFIED",
@@ -56,7 +55,7 @@ export class QuotaService {
 
       // Step B: Get Models & Quota
       const requestBody = projectId ? { project: projectId } : {};
-      const modelsData = await this.fetchWithFallback('/v1internal:fetchAvailableModels', token, requestBody);
+      const modelsData = await this.fetchWithFallback('/v1internal:fetchAvailableModels', targetEmail, requestBody);
 
       return this.mapResponseToUserInfo(subData, modelsData, targetEmail);
     } catch (e) {
@@ -69,27 +68,57 @@ export class QuotaService {
     }
   }
 
-  private async fetchWithFallback(path: string, token: string, body: any): Promise<any> {
-    let lastError;
-    for (const endpoint of ENDPOINTS) {
-      try {
-        const res = await fetch(`${endpoint}${path}`, {
-          method: 'POST',
-          headers: { ...HEADERS, Authorization: `Bearer ${token}` },
-          body: JSON.stringify(body)
-        });
-        if (res.ok) {
-          return await res.json();
-        }
+  private async fetchWithFallback(path: string, email: string, body: any): Promise<any> {
+    let token = await accountManager.getValidToken(email);
+    if (!token) throw new Error('No valid token');
 
-        const errorText = await res.text();
-        console.error(`Failed at ${endpoint}: ${res.status}`, errorText);
-      } catch (e) {
-        lastError = e;
-        console.debug(`Error at ${endpoint}`, e);
+    const tryEndpoints = async (currentToken: string) => {
+      let lastError;
+      for (const endpoint of ENDPOINTS) {
+        try {
+          const res = await fetch(`${endpoint}${path}`, {
+            method: 'POST',
+            headers: { ...HEADERS, Authorization: `Bearer ${currentToken}` },
+            body: JSON.stringify(body)
+          });
+          
+          if (res.ok) {
+            return { success: true, data: await res.json() };
+          }
+
+          if (res.status === 401 || res.status === 403) {
+             return { success: false, status: res.status, error: new Error(`Auth error: ${res.status}`) };
+          }
+
+          const errorText = await res.text();
+          console.error(`Failed at ${endpoint}: ${res.status}`, errorText);
+          lastError = new Error(`Failed at ${endpoint}: ${res.status}`);
+        } catch (e) {
+          lastError = e;
+          console.debug(`Error at ${endpoint}`, e);
+        }
+      }
+      return { success: false, error: lastError || new Error(`All endpoints failed for ${path}`) };
+    };
+
+    // Attempt 1
+    let result = await tryEndpoints(token);
+    if (result.success) return result.data;
+
+    // Attempt 2 (Refresh if Auth Error)
+    if (result.status === 401 || result.status === 403) {
+      console.log('Auth failed (401/403), forcing refresh...');
+      token = await accountManager.forceTokenRefresh(email);
+      
+      if (token) {
+        result = await tryEndpoints(token);
+        if (result.success) return result.data;
+      } else {
+        console.error('Failed to force refresh token');
       }
     }
-    throw lastError || new Error(`All endpoints failed for ${path}`);
+
+    throw result.error;
   }
 
   private mapResponseToUserInfo(subData: any, modelsData: any, email: string): UserInfo {
