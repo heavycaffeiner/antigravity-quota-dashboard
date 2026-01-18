@@ -7,5 +7,5 @@ services:
       dockerfile: Dockerfile
     container_name: antigravity-dashboard
     ports:
-      - "8080:80"
+      - "3904:80"
     restart: unless-stopped

@@ -39,7 +39,7 @@ export class AuthService {
       }
     }
 
-    const redirectUri = window.location.origin;
+    const redirectUri = 'http://localhost:51121';
 
     const params = new URLSearchParams({
       client_id: CLIENT_ID,
@@ -60,7 +60,7 @@ export class AuthService {
     const verifier = sessionStorage.getItem('pkce_verifier');
     if (!verifier) throw new Error('No PKCE verifier found');
 
-    const redirectUri = window.location.origin;
+    const redirectUri = 'http://localhost:51121';
 
     const params = new URLSearchParams({
       client_id: CLIENT_ID,
