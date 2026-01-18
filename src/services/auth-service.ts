@@ -23,7 +23,7 @@ const SCOPES = [
 export class AuthService {
   private verifier: string = '';
 
-  async initiateLogin() {
+  async getLoginUrl(): Promise<string> {
     this.verifier = this.generateCodeVerifier();
     sessionStorage.setItem('pkce_verifier', this.verifier);
 
@@ -53,7 +53,12 @@ export class AuthService {
       include_granted_scopes: 'true'
     });
 
-    window.location.href = `${AUTH_ENDPOINT}?${params.toString()}`;
+    return `${AUTH_ENDPOINT}?${params.toString()}`;
+  }
+
+  async initiateLogin() {
+    const url = await this.getLoginUrl();
+    window.location.href = url;
   }
 
   async handleCallback(code: string): Promise<TokenResponse> {

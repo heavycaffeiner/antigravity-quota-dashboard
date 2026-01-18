@@ -4,10 +4,37 @@ import { customElement, state } from 'lit/decorators.js';
 @customElement('login-view')
 export class LoginView extends LitElement {
   @state() private isLoading = false;
+  @state() private showManualInput = false;
+  @state() private manualCode = '';
 
   private _handleLogin() {
     this.isLoading = true;
     this.dispatchEvent(new CustomEvent('login-start', {
+      bubbles: true,
+      composed: true
+    }));
+    // Keep loading state until window focus returns or manual input
+  }
+
+  private _toggleManualInput() {
+    this.showManualInput = !this.showManualInput;
+  }
+
+  private _handleManualSubmit() {
+    if (!this.manualCode) return;
+    
+    // Extract code from URL if full URL is pasted
+    let code = this.manualCode;
+    try {
+      const url = new URL(this.manualCode);
+      const codeParam = url.searchParams.get('code');
+      if (codeParam) code = codeParam;
+    } catch (e) {
+      // Not a URL, treat as raw code
+    }
+
+    this.dispatchEvent(new CustomEvent('manual-login', {
+      detail: { code },
       bubbles: true,
       composed: true
     }));
@@ -35,6 +62,30 @@ export class LoginView extends LitElement {
               <span>Sign in with Google</span>
             </div>
           </button>
+
+          <div class="manual-section">
+            <button class="text-btn" @click=${this._toggleManualInput}>
+              Trouble logging in? (Headless Mode)
+            </button>
+            
+            ${this.showManualInput ? html`
+              <div class="input-group">
+                <input 
+                  type="text" 
+                  placeholder="Paste localhost URL or Code here"
+                  .value=${this.manualCode}
+                  @input=${(e: Event) => this.manualCode = (e.target as HTMLInputElement).value}
+                  @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this._handleManualSubmit()}
+                />
+                <button class="verify-btn" @click=${this._handleManualSubmit}>Verify</button>
+              </div>
+              <p class="help-text">
+                1. Click "Sign in" (opens new tab)<br>
+                2. Complete login<br>
+                3. If redirected to broken page, copy that URL here
+              </p>
+            ` : ''}
+          </div>
           
           <div class="footer">
             <p>Manage your AI quotas efficiently</p>
@@ -187,6 +238,68 @@ export class LoginView extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 12px;
+    }
+
+    /* Manual Section */
+    .manual-section {
+      margin-top: 1.5rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .text-btn {
+      background: none;
+      border: none;
+      color: var(--text-secondary, #a1a1a1);
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0;
+    }
+
+    .text-btn:hover {
+      color: var(--text-primary, #ededed);
+    }
+
+    .input-group {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
+
+    input {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      color: white;
+      font-size: 0.9rem;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--accent-blue, #0070f3);
+    }
+
+    .verify-btn {
+      background: var(--accent-blue, #0070f3);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .help-text {
+      font-size: 0.8rem;
+      color: #666;
+      text-align: center;
+      line-height: 1.4;
     }
 
     .footer {
