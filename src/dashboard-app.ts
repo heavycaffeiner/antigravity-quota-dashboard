@@ -127,12 +127,20 @@ export class DashboardApp extends LitElement {
     accountManager.setActiveAccount(email);
   }
 
-  private _onLoginStart() {
-    authService.initiateLogin();
+  private async _handleManualLogin(e: CustomEvent) {
+    const code = e.detail.code;
+    if (code) {
+      await this._handleOAuthCallback(code);
+    }
+  }
+
+  private async _onLoginStart() {
+    const url = await authService.getLoginUrl();
+    window.open(url, '_blank');
   }
 
   private _onAddAccount() {
-    authService.initiateLogin();
+    this._onLoginStart();
   }
 
   private _onLogoutAccount(e: CustomEvent) {
@@ -150,7 +158,10 @@ export class DashboardApp extends LitElement {
     }
 
     if (this.accounts.length === 0) {
-      return html`<login-view @login-start=${this._onLoginStart}></login-view>`;
+      return html`<login-view 
+        @login-start=${this._onLoginStart}
+        @manual-login=${this._handleManualLogin}
+      ></login-view>`;
     }
 
     return html`
